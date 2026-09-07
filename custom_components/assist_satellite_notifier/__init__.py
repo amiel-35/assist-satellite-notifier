@@ -138,7 +138,8 @@ def _resolve_service_name(hass: HomeAssistant, entry: ConfigEntry) -> str:
     a service, so a collision falls back to `_<n>`. That resolution is
     done **once** and persisted in `entry.data[CONF_SERVICE_NAME]`; it is
     redone only when the title changes to something the stored name no
-    longer derives from. Resolving it afresh on every load would be wrong
+    longer derives from, or when another entry has taken that name in the
+    meantime. Resolving it afresh on every load would be wrong
     twice over: an entry that fell back to `_2` would be promoted to the
     unsuffixed name as soon as it happened to load first, and a rename
     onto a name another entry already owns would hand this entry a name
@@ -151,10 +152,15 @@ def _resolve_service_name(hass: HomeAssistant, entry: ConfigEntry) -> str:
     stored name its title no longer derives from -- are resolved in
     config-entry order, so two of them starting together cannot claim the
     same name.
-    """
-    if (stored := _owned_name(entry)) is not None:
-        return stored
 
+    A stored name is honoured only while no other entry owns it. It can
+    have been given away in the meantime: a name its entry stopped
+    wanting is free for a newcomer to take (`_owned_name`), and renaming
+    that entry back to its old title makes the stored name derive from
+    the title once more. Honouring it then would have both entries hold
+    the same name -- and core's early return would leave whichever
+    registers second with no service at all.
+    """
     base = _service_slug(entry)
     entries = hass.config_entries.async_entries(DOMAIN)
     taken = {
@@ -162,9 +168,17 @@ def _resolve_service_name(hass: HomeAssistant, entry: ConfigEntry) -> str:
         for other in entries
         if other.entry_id != entry.entry_id and (name := _owned_name(other)) is not None
     }
+    if (stored := _owned_name(entry)) is not None and stored not in taken:
+        return stored
+
     for other in entries:
         if other.entry_id == entry.entry_id:
             break
+        # Only an entry sharing this base can reserve a fallback of it,
+        # and one that stored nothing has never loaded. Unreachable in
+        # practice -- setting an entry up resolves and persists in the
+        # same event-loop turn -- but it keeps the answer independent of
+        # who asks first.
         if _owned_name(other) is not None or _service_slug(other) != base:
             continue
         taken.add(_first_free(base, taken))

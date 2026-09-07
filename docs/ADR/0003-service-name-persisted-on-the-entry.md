@@ -55,9 +55,9 @@ current title no longer derives from the stored name.
 The rules, in full:
 
 1. An entry keeps a stored name for as long as that name is the entry's
-   title slug or one of its `_<n>` fallbacks (`_is_derived_from`). A
-   reload, a restart, or another entry appearing or disappearing never
-   changes it.
+   title slug or one of its `_<n>` fallbacks (`_is_derived_from`) and no
+   other entry owns it. A reload, a restart, or another entry appearing
+   or disappearing never changes it.
 2. A name is recomputed when, and only when, the title changes to
    something the stored name no longer derives from.
 3. Resolution counts as **taken** every name another entry still owns —
@@ -65,6 +65,17 @@ The rules, in full:
    entry's current title. A stored name whose entry has since been
    renamed is not taken: nothing will ever register it again, and
    reserving it would make it unusable forever.
+
+   What rule 2 gives away, rule 3 does not give back. A name freed this
+   way can be taken by another entry, and the entry that let it go can
+   be renamed back to the title it derives from — "Hall", disabled,
+   renamed "Kitchen", its `satellite_hall` taken by a newcomer, renamed
+   "Hall" again. Its stored name derives from its title once more, so
+   the taken set is computed **before** the stored name is honoured, and
+   a stored name that is now somebody else's falls back like any other
+   collision. Resolving and persisting happen in the same event-loop
+   turn (`async_setup_entry`), so whichever entry resolves first keeps
+   the name and the other lands on `_<n>`, in either load order.
 4. Entries with no name of their own — a fresh pair, an entry upgrading
    from a build that predates the key, an entry renamed while it was
    disabled — are resolved in config-entry order, so two starting
