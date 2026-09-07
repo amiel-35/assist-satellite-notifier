@@ -9,7 +9,8 @@ from homeassistant.components.assist_satellite import (
     DOMAIN as ASSIST_SATELLITE_DOMAIN,
     SatelliteBusyError,
 )
-from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.components.notify import NotifyEntityFeature
+from homeassistant.const import ATTR_SUPPORTED_FEATURES, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
@@ -179,3 +180,45 @@ async def test_the_platform_refuses_an_entry_without_runtime_data(
     entry.add_to_hass(hass)
 
     assert await async_get_service(hass, {}, {"entry_id": entry.entry_id}) is None
+
+
+async def test_the_notify_entity_advertises_the_title_feature(
+    hass: HomeAssistant, announce_calls: list[ServiceCall], satellite_state: None
+) -> None:
+    """`title` is consumed, so the feature that gates it has to be declared."""
+    await _setup(hass)
+
+    state = hass.states.get(NOTIFY_ENTITY)
+    assert state is not None
+    assert state.attributes[ATTR_SUPPORTED_FEATURES] == NotifyEntityFeature.TITLE
+
+
+async def test_a_service_name_owned_by_someone_else_is_not_hijacked(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A name already registered elsewhere is reported, not silently taken.
+
+    Core's `BaseNotificationService.async_register_services` returns early
+    when the service exists, so without this check the entry would look
+    set up while owning nothing -- and would retract someone else's
+    service on unload.
+    """
+    calls: list[ServiceCall] = []
+
+    async def _other(call: ServiceCall) -> None:
+        calls.append(call)
+
+    hass.services.async_register(NOTIFY_DOMAIN, SERVICE, _other)
+
+    entry = await _setup(hass)
+
+    assert "is already registered" in caplog.text
+    assert entry.runtime_data.legacy_service_registered is False
+
+    # Unloading must leave the other owner's service alone.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.services.has_service(NOTIFY_DOMAIN, SERVICE)

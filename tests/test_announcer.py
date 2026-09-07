@@ -453,3 +453,68 @@ async def test_a_non_mapping_data_payload_is_refused(
 
     assert err.value.translation_key == "invalid_data"
     assert not announce_calls
+
+
+async def test_quiet_hours_follow_the_instance_timezone(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """The window is local time, not UTC.
+
+    23:30 UTC is 01:30 in Paris, inside a 00:00-07:00 night window that
+    the same instant would fall outside of if the comparison were made in
+    UTC.
+    """
+    await hass.config.async_set_time_zone("Europe/Paris")
+    freezer.move_to("2026-09-07 23:30:00")
+    await _setup(
+        hass,
+        **{
+            CONF_QUIET_START: "00:00:00",
+            CONF_QUIET_END: "07:00:00",
+            CONF_QUIET_BEHAVIOUR: QUIET_BEHAVIOUR_REFUSE,
+        },
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await _notify(hass)
+
+    assert err.value.translation_key == "quiet_hours"
+    assert not announce_calls
+
+
+async def test_the_quiet_window_shifts_with_a_dst_change(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """The window follows the wall clock across a DST transition.
+
+    Europe/Paris leaves summer time at 03:00 on 2026-10-25. The same UTC
+    instant is 07:00 local the day before (inside a 06:30-08:00 window)
+    and 06:00 local on the transition day (outside it). This is the
+    documented behaviour, not an accident: the window is a local wall
+    clock window (docs/known-issues.md).
+    """
+    await hass.config.async_set_time_zone("Europe/Paris")
+    freezer.move_to("2026-10-24 05:00:00")
+    await _setup(
+        hass,
+        **{
+            CONF_QUIET_START: "06:30:00",
+            CONF_QUIET_END: "08:00:00",
+            CONF_QUIET_BEHAVIOUR: QUIET_BEHAVIOUR_REFUSE,
+        },
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await _notify(hass)
+    assert err.value.translation_key == "quiet_hours"
+    assert not announce_calls
+
+    freezer.move_to("2026-10-25 05:00:00")
+    await _notify(hass)
+    assert len(announce_calls) == 1
