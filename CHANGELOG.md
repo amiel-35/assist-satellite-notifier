@@ -1,0 +1,59 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-09-07
+
+### Added
+
+- Repository scaffold: `custom_components/assist_satellite_notifier`, CI
+  (hassfest, HACS validation, lint, tests, release), HACS metadata, and
+  the integration icon bundled in-repo.
+- Config flow (one entry per `assist_satellite` entity, duplicates
+  aborted, a satellite without the `ANNOUNCE` feature refused with
+  `satellite_cannot_announce`) and an options flow. Changing an option
+  reloads the entry and takes effect on the next call.
+- Legacy `notify.satellite_<name>` service and a modern `NotifyEntity`,
+  both announcing through the core `assist_satellite.announce` action on
+  the configured satellite, sharing one `SatelliteAnnouncer`. One service
+  device per entry, so several satellites are distinguishable in the UI.
+- Deterministic `_<n>` fallback when two entry titles slugify to the same
+  service name, derived from config-entry order rather than from which
+  name happens to be free — so an entry keeps its service across restarts
+  and reloads.
+- `deny_domains` safety net (`alarm_control_panel`, `lock` by default,
+  case-insensitive, single entity or list): a call whose
+  `data.source_entity` belongs to a denied domain is refused and logged
+  instead of announced. Documented as an opt-in net that only applies when
+  `data.source_entity` is present, not as a guarantee.
+- Quiet hours: a local-time window, wrapping around midnight, with two
+  behaviours — `refuse` fails the call, `skip_preannounce` announces
+  without the chime — and a `data.priority: "critical"` bypass.
+- Per-call `data` keys `source_entity`, `priority`, `preannounce` and
+  `media_id`, validated up front. Anything else is refused with a
+  translated error rather than silently ignored.
+- Refusals raise (ADR-015 of the suite): a deny-list hit, an invalid
+  `data` payload, quiet hours, a busy satellite (`SatelliteBusyError` from
+  core) and an unavailable satellite all reach the caller as translated
+  `ServiceValidationError`s.
+- The notify entity follows its satellite's availability, and is
+  `unavailable` whenever the satellite is.
+- Removing, unloading or reloading an entry retracts its
+  `notify.satellite_<name>` service; Home Assistant core never does this
+  for a legacy notify service. Renaming the entry renames the service.
+- `MINOR_VERSION` and a no-op `async_migrate_entry`, so the first schema
+  change can ship as a migration.
+- Diagnostics (resilient to an entry that is not loaded), translations
+  (`en`, `fr`; `es` machine translated), a fully assessed
+  `quality_scale.yaml`, and tests covering the entry lifecycle, the config
+  and options flows, the announcing policy, both notify surfaces,
+  diagnostics, translation key parity, and one end-to-end pass against a
+  real `assist_satellite` entity.
+
+[Unreleased]: https://github.com/amiel-35/assist-satellite-notifier/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/amiel-35/assist-satellite-notifier/releases/tag/v0.1.0
