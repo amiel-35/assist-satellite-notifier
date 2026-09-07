@@ -13,9 +13,8 @@ Nothing is swallowed: refusals raise a translated
 `ServiceValidationError` instead of failing silently. A deny-list
 refusal, a malformed `data` payload, quiet hours, a busy satellite and an
 unavailable satellite all reach the caller that way; anything else
-reaches it as a `HomeAssistantError`. (This is ADR-015 of the notify
-suite these integrations belong to:
-https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md)
+reaches it as a `HomeAssistantError`. See
+docs/ADR/0002-refusals-raise-service-validation-error.md.
 """
 
 from __future__ import annotations

@@ -23,8 +23,8 @@ What it does own is the policy in front of that action:
 A refusal is raised, never swallowed: it reaches the caller as a
 translated `ServiceValidationError` instead of failing silently, because
 an automation that believes it spoke when it did not is worse than a red
-error in its trace. (This is ADR-015 of the notify suite these
-integrations belong to: https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md)
+error in its trace. See docs/ADR/0002-refusals-raise-service-validation-error.md,
+which also lists which refusal logs at which level.
 """
 
 from __future__ import annotations

@@ -103,7 +103,7 @@ payload; `NotifyEntity` has none.
 | Key | Type | What it does |
 |---|---|---|
 | `source_entity` | entity ID, or a list of them | The entity the message is *about*. Used only to enforce the deny list; never spoken, never forwarded. |
-| `priority` | string | `critical` bypasses quiet hours entirely, chime included. Any other value is accepted and ignored. |
+| `priority` | `info`, `normal`, `high` or `critical` | `critical` bypasses quiet hours entirely, chime included. The other three are accepted and do nothing. The vocabulary is exact and lowercase: `Critical` and `urgent` are refused, not ignored. See [ADR 0004](docs/ADR/0004-priority-vocabulary.md). |
 | `preannounce` | boolean | Per-call override of the *Play the pre-announcement sound* option. |
 | `media_id` | string | Play this media file instead of speaking. `message` is still required by `notify`, but is not spoken. |
 
@@ -199,7 +199,7 @@ integration from HACS (or delete
   core API it relies on.
 - [`docs/known-issues.md`](docs/known-issues.md) — what is known to be
   rough, and what was not tested.
-- [`docs/ADR/`](docs/ADR/) — the decisions and why.
+- [`docs/ADR/`](docs/ADR/README.md) — the decisions and why.
 
 Translations: `en` and `fr` are written by hand; **`es` is machine
 translated** and has not been reviewed by a Spanish speaker — corrections

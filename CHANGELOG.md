@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking for callers that sent an unrecognised `data.priority`.**
+  The key is now a closed vocabulary — `info`, `normal`, `high`,
+  `critical` — matched exactly and in lowercase. Only `critical` acts,
+  as before; the other three are accepted and carried without effect.
+  Anything else, `Critical` and `urgent` included, is refused as
+  `invalid_data` instead of being accepted and silently ignored, so a
+  misspelling of the one value that bypasses quiet hours cannot pass
+  unnoticed. ([ADR 0004](docs/ADR/0004-priority-vocabulary.md))
+
+### Fixed
+
+- A service name stored on an entry that has since been renamed is no
+  longer held in reserve. Renaming an entry while it was disabled left
+  its old name reserved forever, so a new entry with that title fell
+  back to `_2` while the plain name was free. Such a name now counts as
+  free, and the renamed entry resolves afresh the next time it loads.
+
+### Documentation
+
+- Local ADRs for this repository's own rules, with an index: refusals
+  raise ([0002](docs/ADR/0002-refusals-raise-service-validation-error.md)),
+  the persisted service name
+  ([0003](docs/ADR/0003-service-name-persisted-on-the-entry.md)) and the
+  priority vocabulary ([0004](docs/ADR/0004-priority-vocabulary.md)).
+  The places that used to cite an ADR of the wider notify suite, which
+  is not readable from here, now cite ADR 0002.
+
 ## [0.1.0] - 2026-09-07
 
 ### Added
@@ -44,9 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refusals raise instead of failing silently: a deny-list hit, an invalid
   `data` payload, quiet hours, a busy satellite (`SatelliteBusyError` from
   core) and an unavailable satellite all reach the caller as translated
-  `ServiceValidationError`s. (ADR-015 of the notify suite these
-  integrations belong to:
-  https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md)
+  `ServiceValidationError`s. ([ADR 0002](docs/ADR/0002-refusals-raise-service-validation-error.md))
 - The notify entity follows its satellite's availability, and is
   `unavailable` whenever the satellite is. It advertises
   `NotifyEntityFeature.TITLE`, the feature core gates the `title` field

@@ -78,7 +78,8 @@ Owned here:
 
 - which `data` keys a call may carry, and a refusal for anything else;
 - the `deny_domains` net on `data.source_entity`;
-- the quiet-hours window, its two behaviours, and the `critical` bypass;
+- the `data.priority` vocabulary, the quiet-hours window, its two
+  behaviours, and the `critical` bypass;
 - turning core's `SatelliteBusyError` and an unavailable satellite into
   translated, caller-facing errors;
 - the two notify surfaces, their naming, and their lifecycle.
@@ -87,7 +88,8 @@ Owned here:
 
 A call is evaluated in this order, and the first refusal wins:
 
-1. **`data` validation** — unknown keys and wrong types.
+1. **`data` validation** — unknown keys, wrong types, and a
+   `data.priority` outside the vocabulary.
 2. **Deny list** — every `data.source_entity`, case-folded by domain.
 3. **Availability** — the satellite's state.
 4. **Quiet hours** — unless `data.priority` is `critical`.
@@ -96,12 +98,20 @@ Validation comes first so that a malformed payload is reported as a
 malformed payload, and not as whatever the first half-read key happened to
 mean.
 
+`data.priority` is a closed vocabulary — `info`, `normal`, `high`,
+`critical` — matched exactly and in lowercase. Only `critical` acts;
+the other three are accepted and carried without effect, and anything
+else is refused as `invalid_data` rather than accepted and ignored, so
+that a caller cannot misspell the one value that changes behaviour and
+be told nothing. See
+[ADR 0004](ADR/0004-priority-vocabulary.md).
+
 ## Refusals raise
 
 The rule: **a refusal raises a translated `ServiceValidationError`
-instead of failing silently.** (It is ADR-015 of the notify suite these
-integrations belong to — [`0015-refusals-raise-service-validation-error.md`](https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md) —
-restated here so this repository is readable on its own.)
+instead of failing silently.** The reasoning, the full table of which
+refusal raises what, and the costs accepted with it are in
+[ADR 0002](ADR/0002-refusals-raise-service-validation-error.md).
 
 Nothing is swallowed. A deny-list refusal, an invalid `data` payload, a
 quiet-hours refusal, a busy satellite and an unavailable satellite all
@@ -146,10 +156,14 @@ by service name, and gets the raised refusal.
 name is chosen here, from the entry title. It is resolved **once** and
 stored in `entry.data[CONF_SERVICE_NAME]`, and recomputed only when the
 title changes to something the stored name no longer derives from. The
-collision suffix is chosen against the names the other entries have
-stored; entries carrying none yet — every entry upgrading from an earlier
-build — resolve in config-entry order, so two of them starting together
-cannot claim the same name.
+collision suffix is chosen against the names the other entries still
+**own** — a stored name counts only while it still derives from that
+entry's current title, because a name left behind by a rename that
+happened while an entry was disabled will never be registered again and
+must not stay reserved. Entries carrying no name of their own — every
+entry upgrading from an earlier build, and any entry renamed while it
+was not loaded — resolve in config-entry order, so two of them starting
+together cannot claim the same name.
 
 Storing it, rather than deriving it on every load, is what makes two
 things true:
@@ -167,6 +181,9 @@ Ownership is tracked, not inferred from the name. The registration records
 whether it really created the service (`legacy_service_registered`), an
 already-taken name is an ERROR rather than a silence, and unload retracts
 only a service this entry created.
+
+The rules in full, and the alternatives turned down, are in
+[ADR 0003](ADR/0003-service-name-persisted-on-the-entry.md).
 
 ## Lifecycle
 
