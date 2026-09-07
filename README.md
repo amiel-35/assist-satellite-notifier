@@ -7,6 +7,19 @@ Assistant.
 [![Lint](https://github.com/amiel-35/assist-satellite-notifier/actions/workflows/lint.yml/badge.svg)](https://github.com/amiel-35/assist-satellite-notifier/actions/workflows/lint.yml)
 [![Test](https://github.com/amiel-35/assist-satellite-notifier/actions/workflows/test.yml/badge.svg)](https://github.com/amiel-35/assist-satellite-notifier/actions/workflows/test.yml)
 
+## Maintenance mode
+
+Since 7 September 2026 this integration is maintained **at low volume**:
+no new features are planned, issues get answered, and the code is kept
+working across Home Assistant releases. It is the one adapter of the suite
+that still fills a real gap — `assist_satellite` has no `notify` platform,
+while any `media_player` can already be a notify target through core's
+`notify: - platform: tts` — which is why it stays when the Cast and AirPlay
+notifiers were archived. Be aware that it has **never been exercised on a
+real satellite**: everything was verified against Home Assistant's test
+harness and demo entities. Real-hardware reports are welcome (see the
+`help wanted` issues).
+
 ## What
 
 One config entry = one `assist_satellite` entity. Each entry gives you two
