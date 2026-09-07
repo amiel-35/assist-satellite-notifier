@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from homeassistant.config_entries import ConfigEntryDisabler
 from homeassistant.core import HomeAssistant, ServiceCall
 
 from custom_components.assist_satellite_notifier import (
@@ -17,6 +18,7 @@ from tests.conftest import SATELLITE, build_entry
 
 NOTIFY_DOMAIN = "notify"
 KITCHEN_SATELLITE = "assist_satellite.kitchen"
+HALL_SATELLITE = "assist_satellite.hall"
 
 
 async def test_setup_registers_the_service_and_the_entity(
@@ -345,6 +347,69 @@ async def test_removing_the_first_of_two_entries_keeps_the_second(
         NOTIFY_DOMAIN, "satellite_kitchen_2", {"message": "hello"}, blocking=True
     )
     assert announce_calls[-1].data["entity_id"] == KITCHEN_SATELLITE
+
+    # A third "Kitchen" added afterwards takes the freed unsuffixed name
+    # rather than queueing behind the surviving `_2`.
+    hass.states.async_set(HALL_SATELLITE, "idle")
+    third = build_entry(title="Kitchen", satellite=HALL_SATELLITE)
+    third.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(third.entry_id)
+    await hass.async_block_till_done()
+
+    assert third.data[CONF_SERVICE_NAME] == "satellite_kitchen"
+    assert second.data[CONF_SERVICE_NAME] == "satellite_kitchen_2"
+
+    await hass.services.async_call(
+        NOTIFY_DOMAIN, "satellite_kitchen", {"message": "hello"}, blocking=True
+    )
+    assert announce_calls[-1].data["entity_id"] == HALL_SATELLITE
+    await hass.services.async_call(
+        NOTIFY_DOMAIN, "satellite_kitchen_2", {"message": "hello"}, blocking=True
+    )
+    assert announce_calls[-1].data["entity_id"] == KITCHEN_SATELLITE
+
+
+async def test_a_stored_name_a_disabled_entry_no_longer_wants_is_not_reserved(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+) -> None:
+    """A disabled entry only holds the name its current title still asks for.
+
+    Renaming an entry while it is disabled leaves a stored name its title
+    no longer derives from. Nothing will ever register that name again, so
+    counting it as taken would make `satellite_hall` unusable for as long
+    as the disabled entry exists.
+    """
+    hass.states.async_set(KITCHEN_SATELLITE, "idle")
+    hall = build_entry(title="Hall")
+    hall.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(hall.entry_id)
+    await hass.async_block_till_done()
+    assert hall.data[CONF_SERVICE_NAME] == "satellite_hall"
+
+    await hass.config_entries.async_set_disabled_by(
+        hall.entry_id, ConfigEntryDisabler.USER
+    )
+    await hass.async_block_till_done()
+    hass.config_entries.async_update_entry(hall, title="Kitchen")
+    await hass.async_block_till_done()
+
+    newcomer = build_entry(title="Hall", satellite=KITCHEN_SATELLITE)
+    newcomer.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(newcomer.entry_id)
+    await hass.async_block_till_done()
+
+    assert newcomer.data[CONF_SERVICE_NAME] == "satellite_hall"
+    assert hass.services.has_service(NOTIFY_DOMAIN, "satellite_hall")
+
+    # And the disabled entry lands on the name its new title asks for when
+    # it comes back.
+    await hass.config_entries.async_set_disabled_by(hall.entry_id, None)
+    await hass.async_block_till_done()
+
+    assert hall.data[CONF_SERVICE_NAME] == "satellite_kitchen"
+    assert hass.services.has_service(NOTIFY_DOMAIN, "satellite_kitchen")
 
 
 async def test_entries_without_a_stored_name_resolve_in_entry_order(

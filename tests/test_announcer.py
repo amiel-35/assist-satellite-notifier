@@ -18,6 +18,7 @@ from custom_components.assist_satellite_notifier.const import (
     CONF_QUIET_BEHAVIOUR,
     CONF_QUIET_END,
     CONF_QUIET_START,
+    PRIORITIES,
     QUIET_BEHAVIOUR_REFUSE,
     QUIET_BEHAVIOUR_SKIP_PREANNOUNCE,
 )
@@ -370,13 +371,28 @@ async def test_a_critical_priority_bypasses_quiet_hours(
     assert announce_calls[0].data["preannounce"] is True
 
 
-async def test_an_unknown_priority_is_carried_without_effect(
+@pytest.mark.parametrize("priority", sorted(PRIORITIES))
+async def test_every_priority_of_the_vocabulary_is_accepted(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+    priority: str,
+) -> None:
+    """The four documented values all pass validation and announce."""
+    await _setup(hass)
+
+    await _notify(hass, data={"priority": priority})
+
+    assert len(announce_calls) == 1
+
+
+async def test_an_accepted_priority_below_critical_does_not_act(
     hass: HomeAssistant,
     announce_calls: list[ServiceCall],
     satellite_state: None,
     freezer: FrozenDateTimeFactory,
 ) -> None:
-    """Only `critical` bypasses quiet hours; other values are just accepted."""
+    """`high` is a valid value, and still only `critical` bypasses quiet hours."""
     freezer.move_to("2026-09-07 23:30:00")
     await _setup(
         hass,
@@ -387,9 +403,32 @@ async def test_an_unknown_priority_is_carried_without_effect(
         },
     )
 
-    with pytest.raises(ServiceValidationError):
+    with pytest.raises(ServiceValidationError) as err:
         await _notify(hass, data={"priority": "high"})
 
+    assert err.value.translation_key == "quiet_hours"
+    assert not announce_calls
+
+
+@pytest.mark.parametrize("priority", ["Critical", "CRITICAL", "urgent", ""])
+async def test_a_priority_outside_the_vocabulary_is_refused(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+    priority: str,
+) -> None:
+    """The vocabulary is exact and lowercase; anything else is `invalid_data`.
+
+    Including the near-misses: a caller that writes `Critical` believes it
+    armed the quiet-hours bypass, and silently accepting the value would
+    let it keep believing that.
+    """
+    await _setup(hass)
+
+    with pytest.raises(ServiceValidationError) as err:
+        await _notify(hass, data={"priority": priority})
+
+    assert err.value.translation_key == "invalid_data"
     assert not announce_calls
 
 

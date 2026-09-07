@@ -60,3 +60,9 @@ ALLOWED_DATA_KEYS: Final[frozenset[str]] = frozenset(
 # hours. Any other string is accepted and ignored, so that a caller can
 # carry its own priority vocabulary through to future versions.
 PRIORITY_CRITICAL: Final = "critical"
+
+# The `data.priority` vocabulary. Declared here for the tests that pin it;
+# not enforced yet.
+PRIORITIES: Final[frozenset[str]] = frozenset(
+    {"info", "normal", "high", PRIORITY_CRITICAL}
+)
