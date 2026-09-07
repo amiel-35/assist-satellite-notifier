@@ -19,7 +19,9 @@ Both share the same `SatelliteAnnouncer` stored on `entry.runtime_data`.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from itertools import count
 
 from homeassistant.components.notify.const import DOMAIN as NOTIFY_DOMAIN
 from homeassistant.components.notify.legacy import (
@@ -42,6 +44,7 @@ from .const import (
     CONF_QUIET_END,
     CONF_QUIET_START,
     CONF_SATELLITE,
+    CONF_SERVICE_NAME,
     DEFAULT_DENY_DOMAINS,
     DEFAULT_PREANNOUNCE,
     DEFAULT_PREFIX_TITLE,
@@ -63,6 +66,12 @@ class AssistSatelliteNotifierRuntimeData:
     # Set by notify.py's `async_get_service` once the legacy service has
     # actually been created, so unload knows which instance to retract.
     legacy_service: BaseNotificationService | None = field(default=None)
+    # Set by `SatelliteNotificationService.async_register_services` only
+    # when it really registered `notify.<service_name>`. It can decline --
+    # another entry, or another integration, already owns that name --
+    # and unload must then leave that service alone instead of retracting
+    # somebody else's.
+    legacy_service_registered: bool = field(default=False)
     # Set by the unload callback. The legacy platform is registered from a
     # dispatcher callback Home Assistant runs in a task of its own
     # (`helpers/discovery.py` -> `async_dispatcher_send_internal`), which
@@ -83,37 +92,66 @@ def _service_slug(entry: ConfigEntry) -> str:
     return f"{SERVICE_NAME_PREFIX}_{slug}"
 
 
-def _service_name(hass: HomeAssistant, entry: ConfigEntry) -> str:
-    """Derive `notify.satellite_<name>` for an entry, resolving collisions.
+def _is_derived_from(service_name: str, base: str) -> bool:
+    """Return whether `service_name` is `base` or one of its `_<n>` fallbacks."""
+    if service_name == base:
+        return True
+    return re.fullmatch(rf"{re.escape(base)}_\d+", service_name) is not None
+
+
+def _first_free(base: str, taken: set[str]) -> str:
+    """Return `base`, or the first `base_<n>` nobody has claimed."""
+    if base not in taken:
+        return base
+    return next(
+        candidate for n in count(2) if (candidate := f"{base}_{n}") not in taken
+    )
+
+
+def _resolve_service_name(hass: HomeAssistant, entry: ConfigEntry) -> str:
+    """Return the `notify.satellite_<name>` service name this entry owns.
 
     The name comes from the entry title, which is what the user sees and
-    renames, so `notify/legacy.py::async_setup_legacy.async_setup_platform`
+    renames: `notify/legacy.py::async_setup_legacy.async_setup_platform`
     slugifies whatever is passed as `CONF_NAME` in the discovery payload
     into the final service name.
 
     Two satellites can legitimately carry the same name (two "Kitchen" in
     two different Home Assistant areas), and the second one must still get
-    a service. The suffix is derived from this entry's rank among the
-    entries that want the same base name, in config-entry order -- not from
-    "which name happens to be free right now" -- so an entry keeps the same
-    service across restarts whatever order the entries load in, and a
-    reload does not silently promote `_2` to the unsuffixed name.
+    a service, so a collision falls back to `_<n>`. That resolution is
+    done **once** and persisted in `entry.data[CONF_SERVICE_NAME]`; it is
+    redone only when the title changes to something the stored name no
+    longer derives from. Resolving it afresh on every load would be wrong
+    twice over: an entry that fell back to `_2` would be promoted to the
+    unsuffixed name as soon as it happened to load first, and a rename
+    onto a name another entry already owns would hand this entry a name
+    core refuses to register a second time
+    (`BaseNotificationService.async_register_services` returns early when
+    the service exists), leaving it silently serviceless.
+
+    Entries carrying no stored name -- every entry upgrading from 0.1.0,
+    and both entries of a fresh pair -- are resolved in config-entry
+    order, so two of them starting together cannot claim the same name.
     """
     base = _service_slug(entry)
-    siblings = [
-        other
-        for other in hass.config_entries.async_entries(DOMAIN)
-        if _service_slug(other) == base
-    ]
-    index = next(
-        (
-            position
-            for position, other in enumerate(siblings)
-            if other.entry_id == entry.entry_id
-        ),
-        0,
-    )
-    return base if index == 0 else f"{base}_{index + 1}"
+    stored = entry.data.get(CONF_SERVICE_NAME)
+    if isinstance(stored, str) and _is_derived_from(stored, base):
+        return stored
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    taken = {
+        name
+        for other in entries
+        if other.entry_id != entry.entry_id
+        and isinstance(name := other.data.get(CONF_SERVICE_NAME), str)
+    }
+    for other in entries:
+        if other.entry_id == entry.entry_id:
+            break
+        if other.data.get(CONF_SERVICE_NAME) or _service_slug(other) != base:
+            continue
+        taken.add(_first_free(base, taken))
+    return _first_free(base, taken)
 
 
 def _build_announcer_config(
@@ -141,11 +179,22 @@ async def async_setup_entry(
 ) -> bool:
     """Set up Assist Satellite Notifier from a config entry."""
     announcer = SatelliteAnnouncer(hass, _build_announcer_config(entry))
-    service_name = _service_name(hass, entry)
+    service_name = _resolve_service_name(hass, entry)
     runtime_data = AssistSatelliteNotifierRuntimeData(
         announcer=announcer, service_name=service_name
     )
     entry.runtime_data = runtime_data
+
+    # Persist the resolved name so it is never recomputed for an unchanged
+    # title. This runs before the update listener is added on purpose: a
+    # real change here fires the entry's listeners, and reloading the
+    # entry that is currently setting up would be a loop. An unchanged
+    # value is a no-op -- `ConfigEntries._async_update_entry` returns
+    # False without firing anything when nothing differs.
+    if entry.data.get(CONF_SERVICE_NAME) != service_name:
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_SERVICE_NAME: service_name}
+        )
 
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
@@ -167,10 +216,24 @@ async def async_setup_entry(
         `entry.async_on_unload` callback is synchronous, so calling it
         would fire a task nothing waits for -- the entry could be set up
         again before the old service is gone.
+
+        Only a service this entry actually registered is retracted.
+        Ownership cannot be inferred from the name: another entry -- or
+        another integration entirely -- may hold it, in which case
+        `SatelliteNotificationService.async_register_services` declined
+        and left `legacy_service_registered` False. Retracting by name
+        regardless would delete a live service belonging to someone else.
         """
         runtime_data.unloaded = True
-        if hass.services.has_service(NOTIFY_DOMAIN, service_name):
+        if runtime_data.legacy_service_registered and hass.services.has_service(
+            NOTIFY_DOMAIN, service_name
+        ):
             hass.services.async_remove(NOTIFY_DOMAIN, service_name)
+        runtime_data.legacy_service_registered = False
+        # The instance is dropped from `notify.legacy`'s registry either
+        # way: core appends it there after `async_register_services`
+        # returns, whether or not that call registered anything
+        # (`notify/legacy.py::async_setup_legacy.async_setup_platform`).
         services = hass.data.get(NOTIFY_SERVICES, {}).get(DOMAIN)
         instance = runtime_data.legacy_service
         if services is not None and instance is not None and instance in services:
@@ -187,6 +250,13 @@ async def async_setup_entry(
     # own tasks (`_async_process_on_unload` in `config_entries.py`), so the
     # discovery cannot still be running against an entry that no longer
     # exists.
+    #
+    # The last argument is the `hass_config` that `async_load_platform`
+    # passes on to `notify`'s own setup, and an empty one is enough here:
+    # this integration is config-entry only, so there is no YAML section
+    # to hand over, and `notify` is a dependency of the platform being
+    # loaded, so it is set up already -- the config would only matter if
+    # this discovery were what first brought `notify` up.
     entry.async_create_task(
         hass,
         discovery.async_load_platform(
@@ -226,6 +296,11 @@ async def async_migrate_entry(
     Nothing to do yet: the entry format has not changed since the first
     release (`VERSION` 1, `MINOR_VERSION` 1). This exists so the first
     schema change ships as a migration instead of as a broken entry.
+
+    `CONF_SERVICE_NAME` is not a schema change: an entry that predates it
+    is valid, and `async_setup_entry` fills the key in on the next load
+    (`_resolve_service_name`). Doing it there rather than here keeps the
+    resolution in the one place that can see what the other entries own.
     """
     return True
 

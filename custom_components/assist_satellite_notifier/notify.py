@@ -9,11 +9,13 @@ and modern automations expect:
 - `async_setup_entry` registers a `NotifyEntity` for the same config entry.
 
 Both build an `AnnounceRequest` and hand it to the shared announcer.
-Nothing is swallowed: per ADR-015 of the suite, a call that did not
-announce fails. A deny-list refusal, a malformed `data` payload, quiet
-hours, a busy satellite and an unavailable satellite all reach the caller
-as a translated `ServiceValidationError`; anything else reaches it as a
-`HomeAssistantError`.
+Nothing is swallowed: refusals raise a translated
+`ServiceValidationError` instead of failing silently. A deny-list
+refusal, a malformed `data` payload, quiet hours, a busy satellite and an
+unavailable satellite all reach the caller that way; anything else
+reaches it as a `HomeAssistantError`. (This is ADR-015 of the notify
+suite these integrations belong to:
+https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md)
 """
 
 from __future__ import annotations
@@ -22,7 +24,11 @@ import logging
 from typing import Any
 
 from homeassistant.components.notify import NotifyEntity, NotifyEntityFeature
-from homeassistant.components.notify.const import ATTR_DATA, ATTR_TITLE
+from homeassistant.components.notify.const import (
+    ATTR_DATA,
+    ATTR_TITLE,
+    DOMAIN as NOTIFY_DOMAIN,
+)
 from homeassistant.components.notify.legacy import BaseNotificationService
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -45,7 +51,7 @@ async def _async_announce(
 
     Every failure is raised to the caller. Swallowing a refusal would
     answer an automation with a silent success for a message nobody ever
-    heard (ADR-015).
+    heard.
     """
     try:
         await announcer.async_announce(request)
@@ -110,10 +116,13 @@ class SatelliteNotificationService(BaseNotificationService):
         self._announcer = runtime_data.announcer
 
     async def async_register_services(self) -> None:
-        """Register the service, unless the entry has already unloaded.
+        """Register the service, unless it cannot or must not be created.
 
-        This platform is set up from a task Home Assistant owns -- the
-        discovery dispatcher runs its listener as a task of its own
+        Two things can stop it.
+
+        The entry may have unloaded already: this platform is set up from
+        a task Home Assistant owns -- the discovery dispatcher runs its
+        listener as a task of its own
         (`helpers/dispatcher.py::async_dispatcher_send_internal`) -- so an
         entry can unload between `async_get_service` returning this
         instance and this method being reached. The unload callback in
@@ -121,13 +130,43 @@ class SatelliteNotificationService(BaseNotificationService):
         exist yet, and registering now would leave a
         `notify.satellite_<name>` bound to a dead announcer with nothing
         left to retract it.
+
+        Or the name may be somebody else's. `super()` returns early and
+        silently when `notify.<name>` already exists
+        (`notify/legacy.py`, `BaseNotificationService`), which would leave
+        this entry looking set up while owning no service and pointing at
+        one that announces on another satellite. Service names are
+        resolved and persisted per entry (see `_resolve_service_name` in
+        __init__.py) so this should not be reachable from this
+        integration alone; it still is when another integration has taken
+        the name, and it is an error worth seeing rather than a silence.
+
+        `legacy_service_registered` records the answer, because unload
+        must retract only a service this instance really created.
+
+        Either way, core appends this instance to
+        `hass.data[NOTIFY_SERVICES]` once this returns -- it does that
+        after the call, not inside it -- so a declined registration still
+        leaves a registry entry behind. That is harmless: the unload
+        callback in __init__.py drops the instance from that list
+        unconditionally, and only the service removal is gated.
         """
         if self._runtime_data.unloaded:
             _LOGGER.debug(
                 "Assist Satellite Notifier entry unloaded before its service registered"
             )
             return
+        if self.hass.services.has_service(NOTIFY_DOMAIN, self._service_name):
+            _LOGGER.error(
+                "Assist Satellite Notifier did not create notify.%s: that service"
+                " is already registered by something else; this entry has no"
+                " legacy notify service. Rename the entry to free a name of its"
+                " own",
+                self._service_name,
+            )
+            return
         await super().async_register_services()
+        self._runtime_data.legacy_service_registered = True
 
     async def async_send_message(self, message: str, **kwargs: Any) -> None:
         """Announce `message` on the configured satellite.
@@ -165,12 +204,19 @@ class SatelliteNotifyEntity(NotifyEntity):
     `strings.json` deliberately declares no name for it, so `_attr_name`
     still wins (`homeassistant/helpers/entity.py::Entity._name_internal`
     returns `_attr_name` before it ever looks a translated name up).
+
+    `NotifyEntityFeature.TITLE` is declared because `title` is consumed
+    here (the `prefix_title` option speaks it ahead of the message). Core
+    gates the field on that flag --
+    `homeassistant/components/notify/__init__.py::NotifyEntity.async_send_message`
+    only forwards `title` when the feature is set -- and the UI hides the
+    field for an entity that does not advertise it.
     """
 
     _attr_has_entity_name = True
     _attr_name = None
     _attr_translation_key = "satellite"
-    _attr_supported_features = NotifyEntityFeature(0)
+    _attr_supported_features = NotifyEntityFeature.TITLE
 
     def __init__(self, entry: AssistSatelliteNotifierConfigEntry) -> None:
         """Initialize the entity."""

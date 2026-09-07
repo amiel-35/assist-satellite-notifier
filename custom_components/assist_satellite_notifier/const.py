@@ -9,6 +9,12 @@ DOMAIN: Final = "assist_satellite_notifier"
 # Config entry data keys. The satellite an entry speaks on is its identity
 # and is not editable; everything else lives in `entry.options`.
 CONF_SATELLITE: Final = "satellite"
+# The resolved `notify.satellite_<name>` service name, persisted the first
+# time the entry sets up and recomputed only when the entry title changes.
+# Stored rather than derived on every load so that two entries can never
+# resolve to the same name, and so that an entry that fell back to `_2`
+# keeps it once the unsuffixed name is free again.
+CONF_SERVICE_NAME: Final = "service_name"
 
 # Config entry option keys.
 CONF_PREANNOUNCE: Final = "preannounce"

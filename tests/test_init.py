@@ -171,7 +171,9 @@ async def test_a_titleless_entry_falls_back_to_the_satellite_name(
     entry = build_entry(title="")
     entry.add_to_hass(hass)
 
-    assert _resolve_service_name(hass, entry) == "satellite_assist_satellite_living_room"
+    assert (
+        _resolve_service_name(hass, entry) == "satellite_assist_satellite_living_room"
+    )
 
 
 async def test_migrate_entry_is_a_no_op(
