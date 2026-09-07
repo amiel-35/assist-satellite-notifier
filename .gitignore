@@ -30,3 +30,6 @@ htmlcov/
 
 # Packaging artifacts
 assist_satellite_notifier.zip
+
+# Agent worktrees live inside the repository
+.worktrees/
