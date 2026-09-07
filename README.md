@@ -37,9 +37,11 @@ timeout of its own.
 
 ## Why
 
-Home Assistant has no `notify` service that speaks. Voice goes through
-`assist_satellite.announce` (or `tts.speak`), which are *actions*: a core
-`alert:` takes a list of notifier names, and cannot call an action. So a
+Home Assistant does ship a `notify` that speaks — the `tts` notify platform
+(`notify: - platform: tts`, one media player per service) — but it targets a
+`media_player`, and an Assist satellite is not one: its announcements go
+through `assist_satellite.announce`, which is an *action*. A core `alert:`
+takes a list of notifier names and cannot call an action. So a
 satellite in the hallway — an ESPHome voice device, a Wyoming satellite, a
 VoIP phone, a tablet running a satellite — cannot be one of the channels an
 alert escalates through, even though it is the one channel that reaches
