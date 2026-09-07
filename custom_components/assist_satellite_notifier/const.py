@@ -57,12 +57,17 @@ ALLOWED_DATA_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 # The one `priority` value this integration acts on: it bypasses quiet
-# hours. Any other string is accepted and ignored, so that a caller can
-# carry its own priority vocabulary through to future versions.
+# hours.
 PRIORITY_CRITICAL: Final = "critical"
 
-# The `data.priority` vocabulary. Declared here for the tests that pin it;
-# not enforced yet.
+# The whole `data.priority` vocabulary: exactly these four words,
+# lowercase, matched exactly. Anything else -- `Critical`, `urgent`, an
+# empty string -- is refused as invalid data rather than accepted and
+# ignored, because a caller that misspells `critical` believes it armed
+# the quiet-hours bypass and nothing would tell it otherwise. The three
+# values below `critical` are accepted and carried without effect, so a
+# caller can keep its own escalation ladder. See
+# docs/ADR/0004-priority-vocabulary.md.
 PRIORITIES: Final[frozenset[str]] = frozenset(
     {"info", "normal", "high", PRIORITY_CRITICAL}
 )

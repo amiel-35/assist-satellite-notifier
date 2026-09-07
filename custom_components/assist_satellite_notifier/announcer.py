@@ -15,7 +15,8 @@ What it does own is the policy in front of that action:
 
 * which `data` keys a call may carry, and a refusal for anything else;
 * the `deny_domains` safety net on `data.source_entity`;
-* the quiet-hours window, and the `data.priority: "critical"` bypass;
+* the `data.priority` vocabulary -- `info`, `normal`, `high`,
+  `critical` -- and the quiet-hours window `critical` bypasses;
 * turning a busy or unavailable satellite into a caller-facing,
   translated `ServiceValidationError` instead of a stack trace.
 
@@ -49,6 +50,7 @@ from .const import (
     ATTR_PRIORITY,
     ATTR_SOURCE_ENTITY,
     DOMAIN,
+    PRIORITIES,
     PRIORITY_CRITICAL,
     QUIET_BEHAVIOUR_REFUSE,
 )
@@ -241,6 +243,14 @@ class SatelliteAnnouncer:
         priority = payload.get(ATTR_PRIORITY)
         if priority is not None and not isinstance(priority, str):
             raise self._invalid_data("priority must be a string")
+        if priority is not None and priority not in PRIORITIES:
+            # Exact and lowercase: `Critical` is a typo for `critical`,
+            # not a synonym, and accepting it would leave the caller
+            # believing it had armed the quiet-hours bypass.
+            raise self._invalid_data(
+                f"unknown priority {priority!r}; accepted values are "
+                f"{', '.join(sorted(PRIORITIES))}"
+            )
 
         preannounce = payload.get(ATTR_PREANNOUNCE)
         if preannounce is not None and not isinstance(preannounce, bool):

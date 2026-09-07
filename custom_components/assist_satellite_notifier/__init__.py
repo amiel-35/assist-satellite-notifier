@@ -99,6 +99,23 @@ def _is_derived_from(service_name: str, base: str) -> bool:
     return re.fullmatch(rf"{re.escape(base)}_\d+", service_name) is not None
 
 
+def _owned_name(entry: ConfigEntry) -> str | None:
+    """Return the service name an entry still owns, or None.
+
+    A stored name only counts while it still derives from the entry's
+    current title. A rename that lands while the entry is not loaded -- a
+    disabled entry, one that failed to set up -- leaves behind a name the
+    entry will never register again, and holding it in reserve would make
+    it unusable for every other entry for as long as that one exists. An
+    entry in that state is treated exactly like one that has stored
+    nothing: it resolves afresh the next time it loads.
+    """
+    stored = entry.data.get(CONF_SERVICE_NAME)
+    if isinstance(stored, str) and _is_derived_from(stored, _service_slug(entry)):
+        return stored
+    return None
+
+
 def _first_free(base: str, taken: set[str]) -> str:
     """Return `base`, or the first `base_<n>` nobody has claimed."""
     if base not in taken:
@@ -129,26 +146,26 @@ def _resolve_service_name(hass: HomeAssistant, entry: ConfigEntry) -> str:
     (`BaseNotificationService.async_register_services` returns early when
     the service exists), leaving it silently serviceless.
 
-    Entries carrying no stored name -- every entry upgrading from 0.1.0,
-    and both entries of a fresh pair -- are resolved in config-entry
-    order, so two of them starting together cannot claim the same name.
+    Entries carrying no name of their own -- every entry upgrading from
+    an earlier build, both entries of a fresh pair, and any entry whose
+    stored name its title no longer derives from -- are resolved in
+    config-entry order, so two of them starting together cannot claim the
+    same name.
     """
-    base = _service_slug(entry)
-    stored = entry.data.get(CONF_SERVICE_NAME)
-    if isinstance(stored, str) and _is_derived_from(stored, base):
+    if (stored := _owned_name(entry)) is not None:
         return stored
 
+    base = _service_slug(entry)
     entries = hass.config_entries.async_entries(DOMAIN)
     taken = {
         name
         for other in entries
-        if other.entry_id != entry.entry_id
-        and isinstance(name := other.data.get(CONF_SERVICE_NAME), str)
+        if other.entry_id != entry.entry_id and (name := _owned_name(other)) is not None
     }
     for other in entries:
         if other.entry_id == entry.entry_id:
             break
-        if other.data.get(CONF_SERVICE_NAME) or _service_slug(other) != base:
+        if _owned_name(other) is not None or _service_slug(other) != base:
             continue
         taken.add(_first_free(base, taken))
     return _first_free(base, taken)
