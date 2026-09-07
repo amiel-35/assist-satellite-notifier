@@ -18,8 +18,21 @@ jobs:
         working-directory: custom_components/assist_satellite_notifier
         run: zip -r ${{ github.workspace }}/assist_satellite_notifier.zip . -x '.*'
 
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; capture=1; next }
+            capture && /^## / { capture=0 }
+            capture { print }
+            END { exit(found ? 0 : 1) }
+          ' CHANGELOG.md > release_notes.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section for tag $GITHUB_REF_NAME. Add one before tagging."
+            exit 1
+          fi
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: assist_satellite_notifier.zip
-          generate_release_notes: true
+          body_path: release_notes.md

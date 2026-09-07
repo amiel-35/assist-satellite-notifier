@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-09-07
 
+**Highlights**
+
+- Initial release: one config entry per `assist_satellite` device, with
+  both a legacy `notify.satellite_<name>` service and a modern notify
+  entity that announce through that satellite.
+- Safety net: calls targeting `alarm_control_panel` or `lock` entities are
+  refused by default (`deny_domains`).
+- Quiet hours: a configurable time window that refuses announcements or
+  skips the pre-announce chime, with a `priority: "critical"` bypass.
+- Refusals (deny-list, invalid data, quiet hours, a busy or unavailable
+  satellite) raise a clear error instead of failing silently.
+- Renaming or removing a config entry keeps its notification service
+  name consistent and never collides with another entry's service.
+
 ### Added
 
 - Repository scaffold: `custom_components/assist_satellite_notifier`, CI
