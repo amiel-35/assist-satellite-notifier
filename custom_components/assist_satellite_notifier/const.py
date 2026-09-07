@@ -9,6 +9,12 @@ DOMAIN: Final = "assist_satellite_notifier"
 # Config entry data keys. The satellite an entry speaks on is its identity
 # and is not editable; everything else lives in `entry.options`.
 CONF_SATELLITE: Final = "satellite"
+# The resolved `notify.satellite_<name>` service name, persisted the first
+# time the entry sets up and recomputed only when the entry title changes.
+# Stored rather than derived on every load so that two entries can never
+# resolve to the same name, and so that an entry that fell back to `_2`
+# keeps it once the unsuffixed name is free again.
+CONF_SERVICE_NAME: Final = "service_name"
 
 # Config entry option keys.
 CONF_PREANNOUNCE: Final = "preannounce"
@@ -51,6 +57,17 @@ ALLOWED_DATA_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 # The one `priority` value this integration acts on: it bypasses quiet
-# hours. Any other string is accepted and ignored, so that a caller can
-# carry its own priority vocabulary through to future versions.
+# hours.
 PRIORITY_CRITICAL: Final = "critical"
+
+# The whole `data.priority` vocabulary: exactly these four words,
+# lowercase, matched exactly. Anything else -- `Critical`, `urgent`, an
+# empty string -- is refused as invalid data rather than accepted and
+# ignored, because a caller that misspells `critical` believes it armed
+# the quiet-hours bypass and nothing would tell it otherwise. The three
+# values below `critical` are accepted and carried without effect, so a
+# caller can keep its own escalation ladder. See
+# docs/ADR/0004-priority-vocabulary.md.
+PRIORITIES: Final[frozenset[str]] = frozenset(
+    {"info", "normal", "high", PRIORITY_CRITICAL}
+)
