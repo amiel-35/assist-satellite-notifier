@@ -1,0 +1,17 @@
+{
+  "domain": "assist_satellite_notifier",
+  "name": "Assist Satellite Notifier",
+  "codeowners": [
+    "@amiel-35"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "assist_satellite"
+  ],
+  "documentation": "https://github.com/amiel-35/assist-satellite-notifier",
+  "integration_type": "helper",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/amiel-35/assist-satellite-notifier/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,57 @@
+# Quality scale self-assessment for Assist Satellite Notifier.
+# Bronze is the target for this first release. Silver/gold are not
+# assessed yet.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: >-
+      This integration registers no custom action of its own. The legacy
+      notify.satellite_<name> service is created by Home Assistant's own
+      notify platform from the discovery payload, and the modern surface is
+      a NotifyEntity.
+  appropriate-polling:
+    status: exempt
+    comment: >-
+      iot_class is calculated: this is a helper integration
+      (integration_type helper) that owns no device and no connection of
+      its own; it only calls assist_satellite.announce on an entity Home
+      Assistant already has. There is nothing to poll.
+  brands:
+    status: todo
+    comment: Brand assets not yet submitted to home-assistant/brands.
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: >-
+      No services.yaml is shipped; behaviour is configured entirely through
+      the config and options flows, and the per-call data keys are
+      documented in the README.
+  docs-conditions:
+    status: exempt
+    comment: This integration does not have any conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: This integration does not have any triggers.
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure:
+    status: exempt
+    comment: >-
+      There is no external device or service to connect to during setup:
+      the satellite is picked from entities Home Assistant already knows
+      about. What can be checked locally is checked: the user step refuses
+      a satellite whose supported_features lacks ANNOUNCE, since such a
+      satellite could never speak a notification.
+  test-before-setup:
+    status: exempt
+    comment: Same reasoning as test-before-configure.
+  unique-config-entry: done

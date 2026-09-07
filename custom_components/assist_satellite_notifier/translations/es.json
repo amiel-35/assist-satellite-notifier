@@ -1,0 +1,88 @@
+{
+  "title": "Assist Satellite Notifier",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar Assist Satellite Notifier",
+        "description": "Assist Satellite Notifier convierte un satélite Assist en un servicio notify, para que una alerta o una automatización pueda incluirlo entre sus notificadores. Elige aquí el satélite; el resto de los ajustes se pueden cambiar después desde las opciones de la integración.",
+        "data": {
+          "satellite": "Satélite Assist",
+          "preannounce": "Reproducir el sonido de aviso",
+          "preannounce_media_id": "Sonido de aviso personalizado",
+          "prefix_title": "Decir el título antes del mensaje",
+          "deny_domains": "Nunca anunciar sobre estos dominios",
+          "quiet_start": "Inicio de las horas de silencio",
+          "quiet_end": "Fin de las horas de silencio",
+          "quiet_behaviour": "Durante las horas de silencio"
+        },
+        "data_description": {
+          "satellite": "La entidad assist_satellite que hará los anuncios. Debe admitir anuncios.",
+          "preannounce": "Reproducir el breve tono del satélite antes de cada anuncio.",
+          "preannounce_media_id": "Identificador de medio o URL opcional de un sonido que sustituye al tono por defecto del satélite.",
+          "prefix_title": "Cuando una llamada incluye un título, decirlo antes del mensaje. Desactivado por defecto: un mensaje hablado no tiene línea de título.",
+          "deny_domains": "Dominios de entidad separados por comas. Una llamada cuyo data.source_entity pertenece a uno de ellos se rechaza y se registra en lugar de anunciarse.",
+          "quiet_start": "Inicio del intervalo durante el cual los anuncios se retienen. Déjalo vacío para desactivar las horas de silencio.",
+          "quiet_end": "Fin del intervalo. Un intervalo que termina antes de empezar cruza la medianoche.",
+          "quiet_behaviour": "Qué hace una llamada que cae dentro del intervalo. Una llamada con priority critical en su carga data siempre pasa sin cambios."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Este satélite ya está configurado en Assist Satellite Notifier."
+    },
+    "error": {
+      "satellite_cannot_announce": "Este satélite no admite anuncios, así que nunca podrá decir una notificación. Elige otro."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ajustes de Assist Satellite Notifier",
+        "description": "Cambia cómo Assist Satellite Notifier anuncia en este satélite.",
+        "data": {
+          "preannounce": "Reproducir el sonido de aviso",
+          "preannounce_media_id": "Sonido de aviso personalizado",
+          "prefix_title": "Decir el título antes del mensaje",
+          "deny_domains": "Nunca anunciar sobre estos dominios",
+          "quiet_start": "Inicio de las horas de silencio",
+          "quiet_end": "Fin de las horas de silencio",
+          "quiet_behaviour": "Durante las horas de silencio"
+        },
+        "data_description": {
+          "preannounce": "Reproducir el breve tono del satélite antes de cada anuncio.",
+          "preannounce_media_id": "Identificador de medio o URL opcional de un sonido que sustituye al tono por defecto del satélite.",
+          "prefix_title": "Cuando una llamada incluye un título, decirlo antes del mensaje. Desactivado por defecto: un mensaje hablado no tiene línea de título.",
+          "deny_domains": "Dominios de entidad separados por comas. Una llamada cuyo data.source_entity pertenece a uno de ellos se rechaza y se registra en lugar de anunciarse.",
+          "quiet_start": "Inicio del intervalo durante el cual los anuncios se retienen. Déjalo vacío para desactivar las horas de silencio.",
+          "quiet_end": "Fin del intervalo. Un intervalo que termina antes de empezar cruza la medianoche.",
+          "quiet_behaviour": "Qué hace una llamada que cae dentro del intervalo. Una llamada con priority critical en su carga data siempre pasa sin cambios."
+        }
+      }
+    }
+  },
+  "selector": {
+    "quiet_behaviour": {
+      "options": {
+        "refuse": "Rechazar el anuncio",
+        "skip_preannounce": "Anunciar, pero sin el tono"
+      }
+    }
+  },
+  "exceptions": {
+    "source_entity_denied": {
+      "message": "Assist Satellite Notifier no anunció un mensaje sobre {source_entity} en {satellite}: el dominio {domain} está en la lista de dominios excluidos de esta entrada."
+    },
+    "invalid_data": {
+      "message": "Assist Satellite Notifier no anunció un mensaje en {satellite}: la carga data no es válida: {error}"
+    },
+    "quiet_hours": {
+      "message": "Assist Satellite Notifier no anunció un mensaje en {satellite}: son horas de silencio (de {quiet_start} a {quiet_end}). Envía priority critical en la carga data para pasar igualmente."
+    },
+    "satellite_busy": {
+      "message": "Assist Satellite Notifier no anunció un mensaje en {satellite}: el satélite está ocupado con otro anuncio o conversación. No se puso nada en cola."
+    },
+    "satellite_unavailable": {
+      "message": "Assist Satellite Notifier no anunció un mensaje en {satellite}: el satélite no está disponible."
+    }
+  }
+}

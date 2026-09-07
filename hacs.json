@@ -1,0 +1,7 @@
+{
+  "name": "Assist Satellite Notifier",
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "assist_satellite_notifier.zip",
+  "homeassistant": "2026.9.1"
+}

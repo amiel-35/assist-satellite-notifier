@@ -1,0 +1,9 @@
+{
+  "entity": {
+    "notify": {
+      "satellite": {
+        "default": "mdi:account-voice"
+      }
+    }
+  }
+}

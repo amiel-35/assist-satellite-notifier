@@ -1,0 +1,88 @@
+{
+  "title": "Assist Satellite Notifier",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Assist Satellite Notifier",
+        "description": "Assist Satellite Notifier turns one Assist satellite into a notify service, so an alert or an automation can list it among its notifiers. Pick the satellite here; every other setting can be changed later from the integration's options.",
+        "data": {
+          "satellite": "Assist satellite",
+          "preannounce": "Play the pre-announcement sound",
+          "preannounce_media_id": "Custom pre-announcement sound",
+          "prefix_title": "Speak the title before the message",
+          "deny_domains": "Never announce about these domains",
+          "quiet_start": "Quiet hours start",
+          "quiet_end": "Quiet hours end",
+          "quiet_behaviour": "During quiet hours"
+        },
+        "data_description": {
+          "satellite": "The assist_satellite entity that will announce. It must support announcements.",
+          "preannounce": "Play the satellite's short chime before each announcement.",
+          "preannounce_media_id": "Optional media ID or URL of a sound to play instead of the satellite's default chime.",
+          "prefix_title": "When a call passes a title, speak it ahead of the message. Off by default: a spoken message has no title line.",
+          "deny_domains": "Comma-separated entity domains. A call whose data.source_entity belongs to one of them is refused and logged instead of announced.",
+          "quiet_start": "Start of the window during which announcements are held back. Leave empty to disable quiet hours.",
+          "quiet_end": "End of the window. A window that ends before it starts wraps around midnight.",
+          "quiet_behaviour": "What a call landing inside the window does. A call with priority critical in its data payload always goes through untouched."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This satellite is already configured for Assist Satellite Notifier."
+    },
+    "error": {
+      "satellite_cannot_announce": "This satellite does not support announcements, so it can never speak a notification. Pick another one."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Assist Satellite Notifier settings",
+        "description": "Change how Assist Satellite Notifier announces on this satellite.",
+        "data": {
+          "preannounce": "Play the pre-announcement sound",
+          "preannounce_media_id": "Custom pre-announcement sound",
+          "prefix_title": "Speak the title before the message",
+          "deny_domains": "Never announce about these domains",
+          "quiet_start": "Quiet hours start",
+          "quiet_end": "Quiet hours end",
+          "quiet_behaviour": "During quiet hours"
+        },
+        "data_description": {
+          "preannounce": "Play the satellite's short chime before each announcement.",
+          "preannounce_media_id": "Optional media ID or URL of a sound to play instead of the satellite's default chime.",
+          "prefix_title": "When a call passes a title, speak it ahead of the message. Off by default: a spoken message has no title line.",
+          "deny_domains": "Comma-separated entity domains. A call whose data.source_entity belongs to one of them is refused and logged instead of announced.",
+          "quiet_start": "Start of the window during which announcements are held back. Leave empty to disable quiet hours.",
+          "quiet_end": "End of the window. A window that ends before it starts wraps around midnight.",
+          "quiet_behaviour": "What a call landing inside the window does. A call with priority critical in its data payload always goes through untouched."
+        }
+      }
+    }
+  },
+  "selector": {
+    "quiet_behaviour": {
+      "options": {
+        "refuse": "Refuse the announcement",
+        "skip_preannounce": "Announce, but without the chime"
+      }
+    }
+  },
+  "exceptions": {
+    "source_entity_denied": {
+      "message": "Assist Satellite Notifier did not announce a message about {source_entity} on {satellite}: the {domain} domain is in this entry's deny list."
+    },
+    "invalid_data": {
+      "message": "Assist Satellite Notifier did not announce a message on {satellite}: the data payload is invalid: {error}"
+    },
+    "quiet_hours": {
+      "message": "Assist Satellite Notifier did not announce a message on {satellite}: it is quiet hours ({quiet_start} to {quiet_end}). Send priority critical in the data payload to go through anyway."
+    },
+    "satellite_busy": {
+      "message": "Assist Satellite Notifier did not announce a message on {satellite}: the satellite is busy with another announcement or conversation. Nothing was queued."
+    },
+    "satellite_unavailable": {
+      "message": "Assist Satellite Notifier did not announce a message on {satellite}: the satellite is unavailable."
+    }
+  }
+}

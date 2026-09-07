@@ -1,0 +1,88 @@
+{
+  "title": "Assist Satellite Notifier",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurer Assist Satellite Notifier",
+        "description": "Assist Satellite Notifier transforme un satellite Assist en service notify, pour qu'une alerte ou une automatisation puisse le citer parmi ses notifieurs. Choisissez ici le satellite ; tous les autres réglages sont modifiables ensuite depuis les options de l'intégration.",
+        "data": {
+          "satellite": "Satellite Assist",
+          "preannounce": "Jouer le son d'annonce",
+          "preannounce_media_id": "Son d'annonce personnalisé",
+          "prefix_title": "Prononcer le titre avant le message",
+          "deny_domains": "Domaines jamais annoncés",
+          "quiet_start": "Début des heures calmes",
+          "quiet_end": "Fin des heures calmes",
+          "quiet_behaviour": "Pendant les heures calmes"
+        },
+        "data_description": {
+          "satellite": "L'entité assist_satellite qui prononcera les annonces. Elle doit prendre en charge les annonces.",
+          "preannounce": "Jouer le court carillon du satellite avant chaque annonce.",
+          "preannounce_media_id": "Identifiant média ou URL optionnel d'un son à jouer à la place du carillon par défaut du satellite.",
+          "prefix_title": "Quand un appel fournit un titre, le prononcer avant le message. Désactivé par défaut : un message parlé n'a pas de ligne de titre.",
+          "deny_domains": "Domaines d'entités séparés par des virgules. Un appel dont data.source_entity appartient à l'un d'eux est refusé et journalisé au lieu d'être annoncé.",
+          "quiet_start": "Début de la plage pendant laquelle les annonces sont retenues. Laisser vide pour désactiver les heures calmes.",
+          "quiet_end": "Fin de la plage. Une plage qui se termine avant de commencer passe par minuit.",
+          "quiet_behaviour": "Ce que fait un appel qui tombe dans la plage. Un appel dont la charge utile data contient priority critical passe toujours sans modification."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Ce satellite est déjà configuré pour Assist Satellite Notifier."
+    },
+    "error": {
+      "satellite_cannot_announce": "Ce satellite ne prend pas en charge les annonces : il ne pourra jamais prononcer de notification. Choisissez-en un autre."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paramètres d'Assist Satellite Notifier",
+        "description": "Modifier la façon dont Assist Satellite Notifier annonce sur ce satellite.",
+        "data": {
+          "preannounce": "Jouer le son d'annonce",
+          "preannounce_media_id": "Son d'annonce personnalisé",
+          "prefix_title": "Prononcer le titre avant le message",
+          "deny_domains": "Domaines jamais annoncés",
+          "quiet_start": "Début des heures calmes",
+          "quiet_end": "Fin des heures calmes",
+          "quiet_behaviour": "Pendant les heures calmes"
+        },
+        "data_description": {
+          "preannounce": "Jouer le court carillon du satellite avant chaque annonce.",
+          "preannounce_media_id": "Identifiant média ou URL optionnel d'un son à jouer à la place du carillon par défaut du satellite.",
+          "prefix_title": "Quand un appel fournit un titre, le prononcer avant le message. Désactivé par défaut : un message parlé n'a pas de ligne de titre.",
+          "deny_domains": "Domaines d'entités séparés par des virgules. Un appel dont data.source_entity appartient à l'un d'eux est refusé et journalisé au lieu d'être annoncé.",
+          "quiet_start": "Début de la plage pendant laquelle les annonces sont retenues. Laisser vide pour désactiver les heures calmes.",
+          "quiet_end": "Fin de la plage. Une plage qui se termine avant de commencer passe par minuit.",
+          "quiet_behaviour": "Ce que fait un appel qui tombe dans la plage. Un appel dont la charge utile data contient priority critical passe toujours sans modification."
+        }
+      }
+    }
+  },
+  "selector": {
+    "quiet_behaviour": {
+      "options": {
+        "refuse": "Refuser l'annonce",
+        "skip_preannounce": "Annoncer, mais sans le carillon"
+      }
+    }
+  },
+  "exceptions": {
+    "source_entity_denied": {
+      "message": "Assist Satellite Notifier n'a pas annoncé un message concernant {source_entity} sur {satellite} : le domaine {domain} figure dans la liste des domaines jamais annoncés de cette entrée."
+    },
+    "invalid_data": {
+      "message": "Assist Satellite Notifier n'a pas annoncé un message sur {satellite} : la charge utile data est invalide : {error}"
+    },
+    "quiet_hours": {
+      "message": "Assist Satellite Notifier n'a pas annoncé un message sur {satellite} : c'est l'heure calme ({quiet_start} à {quiet_end}). Envoyez priority critical dans la charge utile data pour passer quand même."
+    },
+    "satellite_busy": {
+      "message": "Assist Satellite Notifier n'a pas annoncé un message sur {satellite} : le satellite est occupé par une autre annonce ou une conversation. Rien n'a été mis en file d'attente."
+    },
+    "satellite_unavailable": {
+      "message": "Assist Satellite Notifier n'a pas annoncé un message sur {satellite} : le satellite est indisponible."
+    }
+  }
+}
