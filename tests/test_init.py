@@ -431,3 +431,62 @@ async def test_entries_without_a_stored_name_resolve_in_entry_order(
 
     assert _resolve_service_name(hass, second) == "satellite_kitchen_2"
     assert _resolve_service_name(hass, first) == "satellite_kitchen"
+
+
+async def test_a_disabled_entry_renamed_back_does_not_steal_a_taken_name(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+) -> None:
+    """A stored name only counts as owned while nobody else owns it.
+
+    The name a disabled entry no longer wants is handed to a newcomer.
+    Renaming that entry *back* makes its stored name derive from its title
+    again, and it would otherwise be honoured verbatim -- two entries
+    holding `satellite_hall`, and core's early return
+    (`notify/legacy.py::BaseNotificationService.async_register_services`)
+    leaving whichever loads second with no service at all.
+    """
+    hass.states.async_set(KITCHEN_SATELLITE, "idle")
+    hall = build_entry(title="Hall")
+    hall.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(hall.entry_id)
+    await hass.async_block_till_done()
+    assert hall.data[CONF_SERVICE_NAME] == "satellite_hall"
+
+    await hass.config_entries.async_set_disabled_by(
+        hall.entry_id, ConfigEntryDisabler.USER
+    )
+    await hass.async_block_till_done()
+    hass.config_entries.async_update_entry(hall, title="Kitchen")
+    await hass.async_block_till_done()
+
+    newcomer = build_entry(title="Hall", satellite=KITCHEN_SATELLITE)
+    newcomer.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(newcomer.entry_id)
+    await hass.async_block_till_done()
+    assert newcomer.data[CONF_SERVICE_NAME] == "satellite_hall"
+
+    # Renamed back to what it was, while still disabled: the stored name
+    # derives from the title once more, but the newcomer owns it now.
+    hass.config_entries.async_update_entry(hall, title="Hall")
+    await hass.async_block_till_done()
+    assert _resolve_service_name(hass, hall) == "satellite_hall_2"
+
+    await hass.config_entries.async_set_disabled_by(hall.entry_id, None)
+    await hass.async_block_till_done()
+
+    assert hall.data[CONF_SERVICE_NAME] == "satellite_hall_2"
+    assert newcomer.data[CONF_SERVICE_NAME] == "satellite_hall"
+    assert hall.runtime_data.legacy_service_registered
+    assert hass.services.has_service(NOTIFY_DOMAIN, "satellite_hall")
+    assert hass.services.has_service(NOTIFY_DOMAIN, "satellite_hall_2")
+
+    await hass.services.async_call(
+        NOTIFY_DOMAIN, "satellite_hall", {"message": "hello"}, blocking=True
+    )
+    assert announce_calls[-1].data["entity_id"] == KITCHEN_SATELLITE
+    await hass.services.async_call(
+        NOTIFY_DOMAIN, "satellite_hall_2", {"message": "hello"}, blocking=True
+    )
+    assert announce_calls[-1].data["entity_id"] == SATELLITE
