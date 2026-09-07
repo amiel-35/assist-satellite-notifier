@@ -343,3 +343,24 @@ async def test_removing_the_first_of_two_entries_keeps_the_second(
         NOTIFY_DOMAIN, "satellite_kitchen_2", {"message": "hello"}, blocking=True
     )
     assert announce_calls[-1].data["entity_id"] == KITCHEN_SATELLITE
+
+
+async def test_entries_without_a_stored_name_resolve_in_entry_order(
+    hass: HomeAssistant,
+    announce_calls: list[ServiceCall],
+    satellite_state: None,
+) -> None:
+    """Resolution is deterministic before either entry has stored a name.
+
+    Setting an entry up resolves and persists in one event-loop turn, so
+    this is the state a fresh install or an upgrade is in only briefly --
+    but the answer must not depend on which entry asks first.
+    """
+    hass.states.async_set(KITCHEN_SATELLITE, "idle")
+    first = build_entry(title="Kitchen")
+    first.add_to_hass(hass)
+    second = build_entry(title="Kitchen", satellite=KITCHEN_SATELLITE)
+    second.add_to_hass(hass)
+
+    assert _resolve_service_name(hass, second) == "satellite_kitchen_2"
+    assert _resolve_service_name(hass, first) == "satellite_kitchen"
