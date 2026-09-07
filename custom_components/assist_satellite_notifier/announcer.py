@@ -19,9 +19,11 @@ What it does own is the policy in front of that action:
 * turning a busy or unavailable satellite into a caller-facing,
   translated `ServiceValidationError` instead of a stack trace.
 
-Per ADR-015 of the suite, a refusal is raised, never swallowed: an
-automation that believes it spoke when it did not is worse than a red
-error in its trace.
+A refusal is raised, never swallowed: it reaches the caller as a
+translated `ServiceValidationError` instead of failing silently, because
+an automation that believes it spoke when it did not is worse than a red
+error in its trace. (This is ADR-015 of the notify suite these
+integrations belong to: https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md)
 """
 
 from __future__ import annotations

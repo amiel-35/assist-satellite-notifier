@@ -73,8 +73,11 @@ The entry is named after the satellite, and the legacy service takes its
 name from the entry title: an entry called *Living room* becomes
 `notify.satellite_living_room`. Renaming the entry renames the service (and
 breaks automations that used the old name — see *Known limitations*). Two
-entries whose titles slugify the same way get `_2`, `_3`, and so on, in
-config-entry order.
+entries whose titles slugify the same way get `_2`, `_3`, and so on.
+
+The name is resolved once and stored on the entry, so it does not move
+under you: an entry that had to fall back to `_2` keeps it, even after the
+other entry is deleted and the unsuffixed name is free again.
 
 Add one entry per satellite you want to notify on.
 
@@ -180,6 +183,8 @@ integration from HACS (or delete
 - **Renaming the entry renames the service.** Automations referring to the
   old `notify.satellite_<name>` break. That is the price of a readable
   name; the alternative would be an opaque, entry-ID-based service name.
+  Renaming onto a name another entry already owns falls back to `_2`
+  rather than taking it.
 - **`deny_domains` only applies to the legacy service.** `NotifyEntity`
   has no `data` payload, so it cannot declare a `source_entity` to filter
   on.
@@ -195,6 +200,10 @@ integration from HACS (or delete
 - [`docs/known-issues.md`](docs/known-issues.md) — what is known to be
   rough, and what was not tested.
 - [`docs/ADR/`](docs/ADR/) — the decisions and why.
+
+Translations: `en` and `fr` are written by hand; **`es` is machine
+translated** and has not been reviewed by a Spanish speaker — corrections
+are welcome.
 
 ## License
 

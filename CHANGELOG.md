@@ -22,10 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both announcing through the core `assist_satellite.announce` action on
   the configured satellite, sharing one `SatelliteAnnouncer`. One service
   device per entry, so several satellites are distinguishable in the UI.
-- Deterministic `_<n>` fallback when two entry titles slugify to the same
-  service name, derived from config-entry order rather than from which
-  name happens to be free — so an entry keeps its service across restarts
-  and reloads.
+- The service name is resolved once and stored on the config entry, with
+  a deterministic `_<n>` fallback when two entry titles slugify to the
+  same name. An entry keeps its service across restarts, reloads and
+  renames of the other entries: a fallback to `_2` is never promoted to
+  the unsuffixed name, and renaming an entry onto a name another entry
+  already owns falls back instead of colliding. A name owned by something
+  else is reported as an error, and only a service this integration
+  registered is ever retracted.
 - `deny_domains` safety net (`alarm_control_panel`, `lock` by default,
   case-insensitive, single entity or list): a call whose
   `data.source_entity` belongs to a denied domain is refused and logged
@@ -37,12 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-call `data` keys `source_entity`, `priority`, `preannounce` and
   `media_id`, validated up front. Anything else is refused with a
   translated error rather than silently ignored.
-- Refusals raise (ADR-015 of the suite): a deny-list hit, an invalid
+- Refusals raise instead of failing silently: a deny-list hit, an invalid
   `data` payload, quiet hours, a busy satellite (`SatelliteBusyError` from
   core) and an unavailable satellite all reach the caller as translated
-  `ServiceValidationError`s.
+  `ServiceValidationError`s. (ADR-015 of the notify suite these
+  integrations belong to:
+  https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md)
 - The notify entity follows its satellite's availability, and is
-  `unavailable` whenever the satellite is.
+  `unavailable` whenever the satellite is. It advertises
+  `NotifyEntityFeature.TITLE`, the feature core gates the `title` field
+  on.
 - Removing, unloading or reloading an entry retracts its
   `notify.satellite_<name>` service; Home Assistant core never does this
   for a legacy notify service. Renaming the entry renames the service.

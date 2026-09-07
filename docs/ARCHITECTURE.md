@@ -7,7 +7,7 @@
 | Domain | `assist_satellite_notifier` |
 | Integration type | `helper`, `iot_class: calculated`, `config_flow: true`, `dependencies: ["assist_satellite"]` |
 | One config entry | one `assist_satellite` entity; unique ID = that entity ID |
-| Legacy service | `notify.satellite_<slugify(entry title)>`, with a deterministic `_<n>` fallback on collision |
+| Legacy service | `notify.satellite_<slugify(entry title)>`, with a deterministic `_<n>` fallback on collision, resolved once and stored on the entry |
 | Notify entity | one `NotifyEntity` per entry, same behaviour, no `data` payload |
 | Delivery | blocks until the satellite reports the announcement finished |
 | Refusals | translated `ServiceValidationError`, raised — never swallowed |
@@ -55,8 +55,14 @@ Every path below is in `home-assistant/core` 2026.9.1.
   returns `_attr_name` before it looks up a translated name; that is what
   lets the entity carry a `translation_key` for its icon while still
   taking its device's name.
-- `homeassistant/helpers/service.py` — `entity_service_call`, which
-  **skips unavailable entities silently**. See "Availability" below.
+- `homeassistant/components/notify/__init__.py` —
+  `NotifyEntity.async_send_message`, which forwards `title` only when the
+  entity advertises `NotifyEntityFeature.TITLE`; that is why the entity
+  declares it.
+- `homeassistant/helpers/service.py` — `entity_service_call`, which drops
+  unavailable entities from a call without raising, and
+  `homeassistant/helpers/target.py` — `SelectedEntities.log_missing`,
+  which then logs a WARNING about them. See "Availability" below.
 
 ## What is delegated, and what is owned
 
@@ -90,7 +96,12 @@ Validation comes first so that a malformed payload is reported as a
 malformed payload, and not as whatever the first half-read key happened to
 mean.
 
-## Refusals raise — ADR-015 of the suite
+## Refusals raise
+
+The rule: **a refusal raises a translated `ServiceValidationError`
+instead of failing silently.** (It is ADR-015 of the notify suite these
+integrations belong to — [`0015-refusals-raise-service-validation-error.md`](https://github.com/amiel-35/notify-switchboard/blob/main/docs/ADR/0015-refusals-raise-service-validation-error.md) —
+restated here so this repository is readable on its own.)
 
 Nothing is swallowed. A deny-list refusal, an invalid `data` payload, a
 quiet-hours refusal, a busy satellite and an unavailable satellite all
@@ -109,22 +120,53 @@ state in `async_added_to_hass` and reports `unavailable` whenever the
 satellite is. `unknown` counts as available — a satellite that has not
 reported a state since a restart is not a broken one.
 
-There is an asymmetry worth knowing: core's `entity_service_call` filters
-unavailable entities out of a service call **silently**, so
-`notify.send_message` on an unavailable entity is a no-op, not an error.
-The legacy `notify.satellite_<name>` service is not entity-based and does
-reach the announcer, which raises `satellite_unavailable`. Use the legacy
-service when you want the failure to be visible.
+There is an asymmetry worth knowing, and it is precise:
+
+- `notify.send_message` on the entity while the satellite is unavailable
+  **announces nothing and raises nothing**. Core's `entity_service_call`
+  drops unavailable entities from the call
+  (`homeassistant/helpers/service.py`), then reports them through
+  `SelectedEntities.log_missing` (`homeassistant/helpers/target.py`),
+  which logs `Referenced entities … are missing or not currently
+  available` at WARNING. So it is not silent — but the caller's trace
+  shows a success.
+- the legacy `notify.satellite_<name>` service is not entity-based. It
+  reaches the announcer, which raises `satellite_unavailable`, and the
+  caller's trace shows the failure.
+
+Keeping the entity unavailable is the idiomatic choice, and the reason
+the asymmetry exists at all: an entity that misreports itself as
+available to make its own errors louder would lie to every other consumer
+of its state. Core `alert:` is unaffected either way — it calls notifiers
+by service name, and gets the raised refusal.
 
 ## Service naming, and why it survives a reload
 
 `notify/legacy.py` slugifies the discovery payload's `CONF_NAME`, so the
-name is chosen here, from the entry title. Collisions are resolved by this
-entry's **rank among the entries wanting the same base name**, in
-config-entry order — not by "which name is free right now". Two "Kitchen"
-entries are therefore `satellite_kitchen` and `satellite_kitchen_2` across
-restarts and reloads, in any load order; reloading the second one does not
-promote it to the unsuffixed name.
+name is chosen here, from the entry title. It is resolved **once** and
+stored in `entry.data[CONF_SERVICE_NAME]`, and recomputed only when the
+title changes to something the stored name no longer derives from. The
+collision suffix is chosen against the names the other entries have
+stored; entries carrying none yet — every entry upgrading from an earlier
+build — resolve in config-entry order, so two of them starting together
+cannot claim the same name.
+
+Storing it, rather than deriving it on every load, is what makes two
+things true:
+
+- an entry that fell back to `satellite_kitchen_2` keeps that name across
+  restarts and reloads, and is never promoted to the unsuffixed name when
+  that name becomes free;
+- renaming an entry onto a name another entry already owns falls back to
+  `_<n>` instead of colliding. That matters because
+  `BaseNotificationService.async_register_services` returns early when the
+  service exists (`notify/legacy.py`): a colliding entry would end up with
+  no service at all, pointing at one that announces on another satellite.
+
+Ownership is tracked, not inferred from the name. The registration records
+whether it really created the service (`legacy_service_registered`), an
+already-taken name is an ERROR rather than a silence, and unload retracts
+only a service this entry created.
 
 ## Lifecycle
 

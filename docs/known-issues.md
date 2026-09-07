@@ -38,14 +38,26 @@ raised here does not fail the alert — it appears in the log (twice: once
 from this integration, once from the unawaited task). An alert that "did
 not speak" is diagnosed from the log, not from the alert's own state.
 
-## `notify.send_message` on an unavailable satellite is a silent no-op
+## `notify.send_message` on an unavailable satellite announces nothing, and does not fail
 
-`homeassistant/helpers/service.py::entity_service_call` filters
-unavailable entities out of a service call without raising. So calling the
-`NotifyEntity` while the satellite is unavailable does nothing at all, and
-reports nothing. The legacy `notify.satellite_<name>` service is not
-entity-based and does raise `satellite_unavailable`. Use it where a silent
-failure would matter.
+`homeassistant/helpers/service.py::entity_service_call` drops unavailable
+entities from a service call without raising. No error is raised, but it
+is not silent either: core then logs a WARNING through
+`homeassistant/helpers/target.py::SelectedEntities.log_missing` —
+`Referenced entities notify.<name> are missing or not currently
+available`. What the caller sees is a success for a message nobody heard.
+
+The legacy `notify.satellite_<name>` service is not entity-based. It
+reaches the announcer and raises `satellite_unavailable`, so the failure
+lands in the caller's trace. Core `alert:` uses that path (it calls
+notifiers by service name), and so should any automation where a silent
+success would matter.
+
+The entity is deliberately left `unavailable` rather than kept available
+so it could refuse loudly: an entity that misreports its own state to
+improve its error messages lies to everything else that reads that state.
+The asymmetry is the price, and it is documented rather than papered
+over.
 
 ## A satellite renamed at the entity-ID level orphans its entry
 
@@ -61,6 +73,23 @@ registry at all. Rename first, configure second; or delete and re-add.
 `notify.satellite_<name>` follows the entry title. That keeps the name
 readable and predictable, at the cost of breaking automations that used
 the previous name. There is no alias and no redirect.
+
+Renaming an entry onto a name another entry already owns is safe but
+surprising: the renamed entry falls back to `_2` (`satellite_kitchen_2`)
+rather than taking the name, because the entry that registered
+`satellite_kitchen` keeps it. The fallback is stored on the entry and does
+not change again on its own.
+
+## A refusal because the satellite is busy still costs a TTS synthesis
+
+Core checks `_is_announcing` **after** resolving the announcement media,
+not before: `AssistSatelliteEntity.async_internal_announce`
+(`homeassistant/components/assist_satellite/entity.py`) calls
+`_resolve_announcement_media_id` and only then raises `SatelliteBusyError`.
+So a message refused for a busy satellite has already been synthesised —
+billed, on a cloud TTS engine, and latency spent, on any engine. Nothing
+this integration can do about it from the outside; it is worth knowing
+before wiring an automation that retries on `satellite_busy`.
 
 ## `deny_domains` never applies to the notify entity
 
