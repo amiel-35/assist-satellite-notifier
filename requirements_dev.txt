@@ -1,4 +1,4 @@
-homeassistant==2026.9.1
+homeassistant==2026.9.2
 pytest-homeassistant-custom-component==0.13.364
 pytest-cov
 ruff
@@ -9,7 +9,7 @@ mypy
 # `tts`) whenever a config entry loads -- including in tests. Those
 # components import their Python requirements at module level, and
 # `pytest-homeassistant-custom-component` does not install them. Versions
-# pinned to what homeassistant==2026.9.1's manifests require.
+# pinned to what homeassistant==2026.9.2's manifests require.
 hassil==3.12.0
 gazetteer-matcher==1.1.0
 home-assistant-intents==2026.8.28
